@@ -446,6 +446,16 @@ def check_subprocess(record_name: str, record_url: str, ffmpeg_command: list, sa
             else:
                 threading.Thread(target=converts_mp4, args=(save_file_path, delete_origin_file)).start()
         print(f"\n{record_name} {stop_time} 直播录制完成\n")
+        
+        # 停止弹幕录制（录制成功完成时）
+        if record_name in danmu_recorders:
+            try:
+                danmu_recorder = danmu_recorders[record_name]
+                danmu_recorder.stop()
+                del danmu_recorders[record_name]
+                logger.info(f'录制完成，已停止 {record_name} 的弹幕录制')
+            except Exception as e:
+                logger.error(f'停止弹幕录制失败: {e}')
 
         if script_command:
             logger.debug("开始执行脚本命令!")
@@ -473,6 +483,17 @@ def check_subprocess(record_name: str, record_url: str, ffmpeg_command: list, sa
         color_obj.print_colored(f"\n{record_name} {stop_time} 直播录制出错,返回码: {return_code}\n", color_obj.RED)
 
     recording.discard(record_name)
+    
+    # 停止弹幕录制（录制出错时）
+    if record_name in danmu_recorders:
+        try:
+            danmu_recorder = danmu_recorders[record_name]
+            danmu_recorder.stop()
+            del danmu_recorders[record_name]
+            logger.info(f'录制出错，已停止 {record_name} 的弹幕录制')
+        except Exception as e:
+            logger.error(f'停止弹幕录制失败: {e}')
+    
     return False
 
 
