@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    image: ihmily/douyin-live-recorder:latest
+    image: faithererer/douyin-live-recorder:latest
     environment:
       - TERM=xterm-256color
     tty: true
