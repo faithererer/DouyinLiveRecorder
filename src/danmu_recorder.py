@@ -345,7 +345,13 @@ navigator = {{
                         return
             
             with self.file_lock:
-                second = timestamp - self.start_time_t
+                # 计算弹幕时间戳
+                if self.current_segment_file and self.segment_start_time:
+                    # 分段模式：使用分段开始时间作为基准，每个分段从0开始
+                    second = timestamp - self.segment_start_time
+                else:
+                    # 普通模式：使用录制开始时间作为基准
+                    second = timestamp - self.start_time_t
                 
                 if self.current_segment_file:
                     # 分段模式
