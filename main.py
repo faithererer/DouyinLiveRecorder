@@ -31,6 +31,7 @@ from src import spider, stream
 from src.proxy import ProxyDetector
 from src.utils import logger
 from src import utils
+from src.danmu_recorder import create_douyin_danmu_recorder
 from msg_push import (
     dingtalk, xizhi, tg_bot, send_email, bark, ntfy, pushplus
 )
@@ -65,6 +66,8 @@ not_record_list = []
 start_display_time = datetime.datetime.now()
 global_proxy = False
 recording_time_list = {}
+danmu_recorders = {}  # 存储弹幕录制器实例
+danmu_info = {}  # 存储弹幕录制信息
 script_path = os.path.split(os.path.realpath(sys.argv[0]))[0]
 config_file = f'{script_path}/config/config.ini'
 url_config_file = f'{script_path}/config/URL_config.ini'
@@ -376,6 +379,23 @@ def run_script(command: str) -> None:
 def clear_record_info(record_name: str, record_url: str) -> None:
     global monitoring
     recording.discard(record_name)
+    
+    # 停止弹幕录制
+    if record_name in danmu_recorders:
+        try:
+            danmu_recorder = danmu_recorders[record_name]
+            danmu_recorder.stop()
+            del danmu_recorders[record_name]
+            logger.info(f'已停止 {record_name} 的弹幕录制')
+        except Exception as e:
+            logger.error(f'停止弹幕录制失败: {e}')
+    
+    # 清理弹幕信息
+    if record_name in danmu_info:
+        del danmu_info[record_name]
+    if record_url in danmu_info:
+        del danmu_info[record_url]
+    
     if record_url in url_comments and record_url in running_list:
         running_list.remove(record_url)
         monitoring -= 1
@@ -526,6 +546,24 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                     cookies=dy_cookie))
                             port_info = asyncio.run(
                                 stream.get_douyin_stream_url(json_data, record_quality, proxy_address))
+                            
+                            # 预备弹幕录制信息（如果启用且抖音在支持列表中）
+                            if (enable_danmu_recording and '抖音' in danmu_platforms_list and
+                                json_data and json_data.get('status') == 2):
+                                # 从URL中提取房间ID
+                                import re
+                                url_match = re.search(r'live\.douyin\.com/(\d+)', record_url)
+                                if url_match:
+                                    danmu_room_id = url_match.group(1)
+                                    
+                                    # 使用record_url作为临时键存储弹幕录制信息
+                                    danmu_info[record_url] = {
+                                        'room_id': danmu_room_id,
+                                        'platform': '抖音',
+                                        'anchor_name': anchor_name,
+                                        'cookies': dy_cookie
+                                    }
+                                    logger.info(f'检测到抖音直播，准备启动 {anchor_name} 的弹幕录制')
 
                     elif record_url.find("https://www.tiktok.com/") > -1:
                         platform = 'TikTok直播'
@@ -1150,6 +1188,43 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                 start_record_time = datetime.datetime.now()
                                 recording_time_list[record_name] = [start_record_time, record_quality_zh]
                                 rec_info = f"\r{anchor_name} 准备开始录制视频: {full_path}"
+                                
+                                # 启动弹幕录制
+                                if record_url in danmu_info and record_name not in danmu_recorders:
+                                    try:
+                                        danmu_data = danmu_info[record_url]
+                                        logger.info(f'正在启动 {danmu_data["anchor_name"]} 的弹幕录制')
+                                        
+                                        # 确保输出目录存在
+                                        if not os.path.exists(full_path):
+                                            os.makedirs(full_path, exist_ok=True)
+                                        
+                                        danmu_recorder = create_douyin_danmu_recorder(
+                                            room_id=danmu_data['room_id'],
+                                            room_name=danmu_data['anchor_name'],
+                                            output_dir=full_path,  # 传入目录路径
+                                            cookies=danmu_data['cookies']
+                                        )
+                                        danmu_recorders[record_name] = danmu_recorder
+                                        
+                                        # 将键从record_url更新为record_name
+                                        danmu_info[record_name] = danmu_info.pop(record_url)
+                                        
+                                        # 异步启动弹幕录制
+                                        def start_danmu_recording():
+                                            try:
+                                                asyncio.run(danmu_recorder.start(
+                                                    enable_segment=danmu_follow_video_segment and split_video_by_time,
+                                                    segment_time=int(split_time) if split_video_by_time else 1800
+                                                ))
+                                            except Exception as e:
+                                                logger.error(f'弹幕录制启动失败: {e}')
+                                        
+                                        danmu_thread = threading.Thread(target=start_danmu_recording, daemon=True)
+                                        danmu_thread.start()
+                                        logger.info(f'已启动 {danmu_data["anchor_name"]} 的弹幕录制')
+                                    except Exception as e:
+                                        logger.error(f'弹幕录制启动失败: {e}')
                                 if show_url:
                                     re_plat = ('WinkTV', 'PandaTV', 'ShowRoom', 'CHZZK', 'Youtube')
                                     if platform in re_plat:
@@ -1351,11 +1426,26 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                     filename = anchor_name + f'_{title_in_name}' + now + ".mp4"
                                     print(f'{rec_info}/{filename}')
                                     save_file_path = full_path + '/' + filename
+                                    
+                                    # 设置弹幕录制器的视频文件名
+                                    if record_name in danmu_recorders:
+                                        try:
+                                            danmu_recorders[record_name].set_video_filename(filename)
+                                        except Exception as e:
+                                            logger.error(f'设置弹幕文件名失败: {e}')
 
                                     try:
                                         if split_video_by_time:
                                             now = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
                                             save_file_path = f"{full_path}/{anchor_name}_{title_in_name}{now}_%03d.mp4"
+                                            
+                                            # 设置弹幕录制器的视频文件名（分段模式）
+                                            if record_name in danmu_recorders:
+                                                try:
+                                                    base_filename = f"{anchor_name}_{title_in_name}{now}_001.mp4"
+                                                    danmu_recorders[record_name].set_video_filename(base_filename)
+                                                except Exception as e:
+                                                    logger.error(f'设置弹幕文件名失败: {e}')
                                             command = [
                                                 "-c:v", "copy",
                                                 "-c:a", "aac",
@@ -1619,6 +1709,8 @@ def read_config_value(config_parser: configparser.RawConfigParser, section: str,
             config_parser.add_section('Authorization')
         if '账号密码' not in config_parser.sections():
             config_parser.add_section('账号密码')
+        if '弹幕录制设置' not in config_parser.sections():
+            config_parser.add_section('弹幕录制设置')
         return config_parser.get(section, option)
     except (configparser.NoSectionError, configparser.NoOptionError):
         config_parser.set(section, option, str(default_value))
@@ -1798,6 +1890,17 @@ while True:
     migu_cookie = read_config_value(config, 'Cookie', 'migu_cookie', '')
     lianjie_cookie = read_config_value(config, 'Cookie', 'lianjie_cookie', '')
     laixiu_cookie = read_config_value(config, 'Cookie', 'laixiu_cookie', '')
+    
+    # 弹幕录制配置
+    enable_danmu_recording = options.get(read_config_value(config, '弹幕录制设置', '是否启用弹幕录制', "是"), True)
+    danmu_recording_platforms = read_config_value(config, '弹幕录制设置', '弹幕录制平台(逗号分隔)', "抖音")
+    danmu_file_format = read_config_value(config, '弹幕录制设置', '弹幕文件保存格式', "xml")
+    danmu_follow_video_segment = options.get(read_config_value(config, '弹幕录制设置', '弹幕录制是否跟随视频分段', "是"), True)
+    danmu_max_retry = int(read_config_value(config, '弹幕录制设置', '弹幕录制重连次数', 3))
+    danmu_heartbeat_interval = int(read_config_value(config, '弹幕录制设置', '弹幕录制心跳间隔(秒)', 30))
+    
+    # 解析弹幕录制平台列表
+    danmu_platforms_list = [p.strip() for p in danmu_recording_platforms.replace('，', ',').split(',') if p.strip()] if danmu_recording_platforms else []
     picarto_cookie = read_config_value(config, 'Cookie', 'picarto_cookie', '')
 
     video_save_type_list = ("FLV", "MKV", "TS", "MP4", "MP3音频", "M4A音频")
