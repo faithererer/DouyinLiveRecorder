@@ -1254,6 +1254,14 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
 
                                         if split_video_by_time:
                                             print(f'\r{anchor_name} 准备开始录制音频: {save_file_path}')
+                                            
+                                            # 设置弹幕录制器的视频文件名（音频分段模式）
+                                            if record_name in danmu_recorders:
+                                                try:
+                                                    base_filename = f"{anchor_name}_{title_in_name}{now}_001.{extension}"
+                                                    danmu_recorders[record_name].set_video_filename(base_filename)
+                                                except Exception as e:
+                                                    logger.error(f'设置弹幕文件名失败: {e}')
 
                                             if "MP3" in video_save_type:
                                                 command = [
@@ -1279,6 +1287,14 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                                 ]
 
                                         else:
+                                            # 设置弹幕录制器的视频文件名（音频非分段模式）
+                                            if record_name in danmu_recorders:
+                                                try:
+                                                    filename = f"{anchor_name}_{title_in_name}{now}.{extension}"
+                                                    danmu_recorders[record_name].set_video_filename(filename)
+                                                except Exception as e:
+                                                    logger.error(f'设置弹幕文件名失败: {e}')
+                                            
                                             if "MP3" in video_save_type:
                                                 command = [
                                                     "-map", "0:a",
@@ -1318,6 +1334,13 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                     filename = anchor_name + f'_{title_in_name}' + now + '.flv'
                                     save_file_path = f'{full_path}/{filename}'
                                     print(f'{rec_info}/{filename}')
+                                    
+                                    # 设置弹幕录制器的视频文件名
+                                    if record_name in danmu_recorders:
+                                        try:
+                                            danmu_recorders[record_name].set_video_filename(filename)
+                                        except Exception as e:
+                                            logger.error(f'设置弹幕文件名失败: {e}')
 
                                     subs_file_path = save_file_path.rsplit('.', maxsplit=1)[0]
                                     subs_thread_name = f'subs_{Path(subs_file_path).name}'
@@ -1378,6 +1401,13 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                     filename = anchor_name + f'_{title_in_name}' + now + ".mkv"
                                     print(f'{rec_info}/{filename}')
                                     save_file_path = full_path + '/' + filename
+                                    
+                                    # 设置弹幕录制器的视频文件名
+                                    if record_name in danmu_recorders:
+                                        try:
+                                            danmu_recorders[record_name].set_video_filename(filename)
+                                        except Exception as e:
+                                            logger.error(f'设置弹幕文件名失败: {e}')
 
                                     try:
                                         if split_video_by_time:
@@ -1489,6 +1519,14 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                         now = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
                                         filename = anchor_name + f'_{title_in_name}' + now + ".ts"
                                         print(f'{rec_info}/{filename}')
+                                        
+                                        # 设置弹幕录制器的视频文件名（分段模式）
+                                        if record_name in danmu_recorders:
+                                            try:
+                                                base_filename = f"{anchor_name}_{title_in_name}{now}_001.ts"
+                                                danmu_recorders[record_name].set_video_filename(base_filename)
+                                            except Exception as e:
+                                                logger.error(f'设置弹幕文件名失败: {e}')
 
                                         try:
                                             save_file_path = f"{full_path}/{anchor_name}_{title_in_name}{now}_%03d.ts"
@@ -1537,6 +1575,13 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                         filename = anchor_name + f'_{title_in_name}' + now + ".ts"
                                         print(f'{rec_info}/{filename}')
                                         save_file_path = full_path + '/' + filename
+                                        
+                                        # 设置弹幕录制器的视频文件名
+                                        if record_name in danmu_recorders:
+                                            try:
+                                                danmu_recorders[record_name].set_video_filename(filename)
+                                            except Exception as e:
+                                                logger.error(f'设置弹幕文件名失败: {e}')
 
                                         try:
                                             command = [
