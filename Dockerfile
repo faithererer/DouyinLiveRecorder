@@ -38,4 +38,4 @@ RUN ln -fs /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
 # 5. 将虚拟环境的路径加入系统 PATH，这样可以直接执行命令
 ENV PATH="/opt/venv/bin:$PATH"
 
-CMD ["python", "main.py"]
+CMD ["/opt/venv/bin/python", "main.py"]
