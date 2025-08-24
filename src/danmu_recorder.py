@@ -271,6 +271,25 @@ navigator = {{
             logger.warning('视频文件名尚未设置，弹幕文件将在视频开始录制后创建')
             return None
     
+    def generate_segment_filename(self, segment_index: int) -> str:
+        """生成分段弹幕文件名"""
+        if self.video_filename:
+            # 从视频文件名中提取基础部分，然后添加分段索引
+            video_path = Path(self.video_filename)
+            base_name = video_path.stem
+            
+            # 如果基础文件名已经包含_000格式，替换为当前分段索引
+            if base_name.endswith('_000'):
+                base_name = base_name[:-4] + f'_{segment_index:03d}'
+            else:
+                # 否则直接添加分段索引
+                base_name = f"{base_name}_{segment_index:03d}"
+            
+            return f"{base_name}.xml"
+        else:
+            logger.warning('视频文件名尚未设置，无法生成分段弹幕文件名')
+            return None
+    
     def set_video_filename(self, video_filename: str) -> None:
         """设置视频文件名，用于生成对应的弹幕文件名"""
         self.video_filename = video_filename
@@ -301,13 +320,16 @@ navigator = {{
         if self.current_segment_file:
             self.close_danmu_file(self.current_segment_file)
         
+        # 递增分段索引
+        self.segment_index += 1
+        
         # 创建新的分段文件
-        filename = self.generate_filename()
+        filename = self.generate_segment_filename(self.segment_index)
         if filename:
             self.current_segment_file = filename
             self.create_danmu_file(self.current_segment_file)
             self.segment_start_time = time.time()
-            logger.info(f'开始新的弹幕分段: {self.current_segment_file}')
+            logger.info(f'开始新的弹幕分段: {self.current_segment_file} (分段索引: {self.segment_index})')
         else:
             logger.warning(f'无法创建分段文件，视频文件名尚未设置')
             self.current_segment_file = None
@@ -315,17 +337,26 @@ navigator = {{
     def write_danmu(self, user: str, content: str, timestamp: float) -> None:
         """写入弹幕到文件 - 插入到XML结束标签前"""
         try:
+            # 检查是否需要创建新的分段（基于时间）
+            if (hasattr(self, 'segment_index') and self.segment_index is not None and
+                hasattr(self, 'segment_time') and self.segment_time and
+                self.segment_start_time and
+                (timestamp - self.segment_start_time) >= self.segment_time):
+                # 需要创建新的分段
+                logger.info(f'分段时间到达，创建新的弹幕分段 (当前分段时长: {timestamp - self.segment_start_time:.1f}秒)')
+                self.start_new_segment()
+            
             # 如果文件还没创建，先创建文件
             if not self.filename and not self.current_segment_file:
                 # 检查是否是分段模式
                 if hasattr(self, 'segment_index') and self.segment_index is not None:
                     # 分段模式，创建第一个分段文件
-                    filename = self.generate_filename()
+                    filename = self.generate_segment_filename(self.segment_index)
                     if filename:
                         self.current_segment_file = filename
                         self.create_danmu_file(self.current_segment_file)
                         self.segment_start_time = time.time()
-                        logger.info(f'创建弹幕分段文件: {self.current_segment_file}')
+                        logger.info(f'创建弹幕分段文件: {self.current_segment_file} (分段索引: {self.segment_index})')
                     else:
                         logger.warning('无法创建弹幕分段文件，视频文件名尚未设置')
                         return
@@ -415,8 +446,10 @@ navigator = {{
         if enable_segment:
             self.segment_index = 0
             self.segment_start_time = None
-            logger.info('弹幕分段模式已启用，将在第一条弹幕到达时创建文件')
+            self.segment_time = segment_time  # 设置分段时间间隔
+            logger.info(f'弹幕分段模式已启用，分段间隔: {segment_time}秒，将在第一条弹幕到达时创建文件')
         else:
+            self.segment_time = None
             logger.info('弹幕录制已启动，将在第一条弹幕到达时创建文件')
         
         # 创建WebSocket连接
