@@ -1279,7 +1279,7 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                             # 设置弹幕录制器的视频文件名（音频分段模式）
                                             if record_name in danmu_recorders:
                                                 try:
-                                                    base_filename = f"{anchor_name}_{title_in_name}{now}_001.{extension}"
+                                                    base_filename = f"{anchor_name}_{title_in_name}{now}_000.{extension}"
                                                     danmu_recorders[record_name].set_video_filename(base_filename)
                                                 except Exception as e:
                                                     logger.error(f'设置弹幕文件名失败: {e}')
@@ -1493,7 +1493,7 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                             # 设置弹幕录制器的视频文件名（分段模式）
                                             if record_name in danmu_recorders:
                                                 try:
-                                                    base_filename = f"{anchor_name}_{title_in_name}{now}_001.mp4"
+                                                    base_filename = f"{anchor_name}_{title_in_name}{now}_000.mp4"
                                                     danmu_recorders[record_name].set_video_filename(base_filename)
                                                 except Exception as e:
                                                     logger.error(f'设置弹幕文件名失败: {e}')
@@ -1544,7 +1544,7 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                         # 设置弹幕录制器的视频文件名（分段模式）
                                         if record_name in danmu_recorders:
                                             try:
-                                                base_filename = f"{anchor_name}_{title_in_name}{now}_001.ts"
+                                                base_filename = f"{anchor_name}_{title_in_name}{now}_000.ts"
                                                 danmu_recorders[record_name].set_video_filename(base_filename)
                                             except Exception as e:
                                                 logger.error(f'设置弹幕文件名失败: {e}')

@@ -259,13 +259,12 @@ navigator = {{
             )
             return ws_url
     
-    def generate_filename(self, segment_index: int = None) -> str:
+    def generate_filename(self) -> str:
         """生成弹幕文件名"""
         if self.video_filename:
-            # 使用视频文件名作为基础，替换扩展名为.xml
+            # 直接使用视频文件名作为基础，替换扩展名为.xml
+            # 这样可以确保弹幕文件名与视频文件名完全一致（除了扩展名）
             base_name = Path(self.video_filename).stem
-            # 直接使用视频文件名对应的弹幕文件名，不添加额外的分段索引
-            # 因为视频文件名已经包含了正确的分段索引
             return f"{base_name}.xml"
         else:
             # 等待视频文件名设置，暂时返回None
@@ -275,7 +274,6 @@ navigator = {{
     def set_video_filename(self, video_filename: str) -> None:
         """设置视频文件名，用于生成对应的弹幕文件名"""
         self.video_filename = video_filename
-        logger.info(f'设置视频文件名: {video_filename}')
         
         # 注意：不在这里立即创建文件，而是在第一条弹幕到达时创建
         # 这样可以避免生成空的弹幕文件
@@ -304,12 +302,11 @@ navigator = {{
             self.close_danmu_file(self.current_segment_file)
         
         # 创建新的分段文件
-        filename = self.generate_filename(self.segment_index)
+        filename = self.generate_filename()
         if filename:
             self.current_segment_file = filename
             self.create_danmu_file(self.current_segment_file)
             self.segment_start_time = time.time()
-            self.segment_index += 1
             logger.info(f'开始新的弹幕分段: {self.current_segment_file}')
         else:
             logger.warning(f'无法创建分段文件，视频文件名尚未设置')
@@ -323,12 +320,11 @@ navigator = {{
                 # 检查是否是分段模式
                 if hasattr(self, 'segment_index') and self.segment_index is not None:
                     # 分段模式，创建第一个分段文件
-                    filename = self.generate_filename(self.segment_index)
+                    filename = self.generate_filename()
                     if filename:
                         self.current_segment_file = filename
                         self.create_danmu_file(self.current_segment_file)
                         self.segment_start_time = time.time()
-                        self.segment_index += 1
                         logger.info(f'创建弹幕分段文件: {self.current_segment_file}')
                     else:
                         logger.warning('无法创建弹幕分段文件，视频文件名尚未设置')
